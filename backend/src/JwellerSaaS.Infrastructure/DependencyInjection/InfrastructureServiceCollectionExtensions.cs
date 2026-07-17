@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using JwellerSaaS.Infrastructure.Identity;
 using Orion.Framework.DependencyInjection;
+using Orion.Framework.Identity;
 
 namespace JwellerSaaS.Infrastructure.DependencyInjection;
 
@@ -7,5 +9,5 @@ namespace JwellerSaaS.Infrastructure.DependencyInjection;
 public static class InfrastructureServiceCollectionExtensions
 {
     /// <summary>Adds infrastructure services.</summary>
-    public static IServiceCollection AddInfrastructureServices(this IServiceCollection services) => services.AddOrionFramework();
+    public static IServiceCollection AddInfrastructureServices(this IServiceCollection services) => services.AddOrionFramework().AddScoped<IRefreshTokenStore, DapperRefreshTokenStore>();
 }

@@ -1,9 +1,13 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Orion.Framework.Audit;
 using Orion.Framework.Data;
 using Orion.Framework.Metadata;
 using Orion.Framework.Sql;
 using Orion.Framework.Tenancy;
+using Orion.Framework.Authentication;
+using Orion.Framework.Authorization;
+using Orion.Framework.Identity;
 
 namespace Orion.Framework.DependencyInjection;
 
@@ -28,6 +32,16 @@ public static class OrionFrameworkServiceCollectionExtensions
         services.AddSingleton<DuplicateBuilder>();
         services.AddScoped<IAuditEngine, AuditEngine>();
         services.AddScoped<ITenantEngine, TenantEngine>();
+        services.AddSingleton<IClaimsBuilder, ClaimsBuilder>();
+        services.AddSingleton<ITokenGenerator, JwtTokenGenerator>();
+        services.AddSingleton<ITokenValidator, JwtTokenValidator>();
+        services.AddScoped<IPermissionService, PermissionService>();
+        services.AddScoped<IOrionAuthorizationService, OrionAuthorizationService>();
+        services.AddSingleton<IAuthorizationHandler, PermissionHandler>();
+        services.AddSingleton<IPasswordHasher, MicrosoftPasswordHasher>();
+        services.AddSingleton<IPasswordHistoryValidator, PasswordHistoryValidator>();
+        services.AddScoped<HeaderTenantResolver>();
+        services.AddScoped<ITenantResolver>(provider => new CompositeTenantResolver(new ITenantResolver[] { provider.GetRequiredService<HeaderTenantResolver>() }));
         return services;
     }
 }
