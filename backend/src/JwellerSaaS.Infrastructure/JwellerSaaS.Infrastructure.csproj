@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\JwellerSaaS.Application\JwellerSaaS.Application.csproj" />
+    <ProjectReference Include="..\Orion.Framework\Orion.Framework.csproj" />
+  </ItemGroup>
+</Project>
