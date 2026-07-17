@@ -1,0 +1,9 @@
+insert into tenant (id, code, name, timezone, currency, country, status, subscription_status, created_by, created_date) values (1, 'DEFAULT', 'Default Tenant', 'UTC', 'USD', 'US', 1, 1, 1, now()) on conflict (id) do nothing;
+insert into branch (id, tenant_id, code, name, timezone, country, is_default, status, created_by, created_date) values (1, 1, 'MAIN', 'Main Branch', 'UTC', 'US', true, 1, 1, now()) on conflict (id) do nothing;
+update tenant set default_branch_id = 1 where id = 1;
+insert into role (id, tenant_id, code, name, is_system, created_by, created_date) values (1, 1, 'ADMINISTRATOR', 'Administrator', true, 1, now()) on conflict (id) do nothing;
+insert into permission (id, code, name, resource, action, created_by, created_date) values (1, 'admin.full_access', 'Full Access', 'admin', 'full_access', 1, now()), (2, 'identity.read', 'Read Identity', 'identity', 'read', 1, now()), (3, 'identity.write', 'Write Identity', 'identity', 'write', 1, now()), (4, 'tenant.read', 'Read Tenant', 'tenant', 'read', 1, now()), (5, 'tenant.write', 'Write Tenant', 'tenant', 'write', 1, now()) on conflict (id) do nothing;
+insert into role_permission (role_id, permission_id, created_by, created_date) select 1, id, 1, now() from permission on conflict (role_id, permission_id) do nothing;
+insert into "user" (id, tenant_id, username, email, password_hash, is_active, language, timezone, created_by, created_date) values (1, 1, 'administrator', 'admin@example.com', 'AQAAAAIAAYagAAAAEJwellerSaaSAdministratorSeedHashV1', true, 'en', 'UTC', 1, now()) on conflict (id) do nothing;
+insert into user_role (user_id, role_id, created_by, created_date) values (1, 1, 1, now()) on conflict (user_id, role_id) do nothing;
+insert into user_branch (user_id, branch_id, is_default, created_by, created_date) values (1, 1, true, 1, now()) on conflict (user_id, branch_id) do nothing;

@@ -1,8 +1,15 @@
 namespace Orion.Framework.Security;
 
-/// <summary>Represents the authenticated user for the current request.</summary>
-public sealed record CurrentUser(long? UserId, string? UserName, IReadOnlySet<string> Roles)
+public sealed record CurrentUser(
+    long? UserId,
+    string? Username,
+    string? Email,
+    long? TenantId,
+    long? BranchId,
+    IReadOnlySet<string> Roles,
+    IReadOnlySet<string> Permissions,
+    string? Language,
+    string? Timezone)
 {
-    /// <summary>Gets an unauthenticated user context.</summary>
-    public static CurrentUser Anonymous { get; } = new(null, null, new HashSet<string>());
+    public static CurrentUser Anonymous { get; } = new(null, null, null, null, null, new HashSet<string>(), new HashSet<string>(), null, null);
 }

@@ -9,4 +9,8 @@
   <ItemGroup>
     <ProjectReference Include="..\JwellerSaaS.Shared\JwellerSaaS.Shared.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
+  </ItemGroup>
 </Project>
