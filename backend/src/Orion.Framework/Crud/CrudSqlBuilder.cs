@@ -23,6 +23,7 @@ public sealed class CrudSqlBuilder
         AppendWhere(sql, metadata, query, parameters);
         AppendSort(sql, metadata, query.Sorts);
         if (options.PageSize is > 0) { parameters.Add("PageSize", options.PageSize.Value); parameters.Add("Offset", options.Offset ?? 0); sql.Append(" LIMIT @PageSize OFFSET @Offset"); }
+        else if (options.Top is > 0) { parameters.Add("Top", options.Top.Value); sql.Append(" LIMIT @Top"); }
         return new SqlStatement(sql.ToString(), parameters);
     }
 
