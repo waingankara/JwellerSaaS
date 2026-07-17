@@ -2,6 +2,7 @@ using Dapper;
 using Orion.Framework.Metadata;
 using Orion.Framework.Pagination;
 using Orion.Framework.Search;
+using Orion.Framework.Query;
 
 namespace Orion.Framework.Sql;
 
@@ -31,5 +32,5 @@ public sealed class SearchBuilder
         foreach (var f in filters) { var c=d.Columns.First(x=>x.PropertyName==f.Field || x.ColumnName==f.Field); var name="p"+i++; parts.Add(ToSql(c, f, name, p)); }
         return new SqlStatement(parts.Count==0 ? string.Empty : "WHERE "+string.Join(" AND ", parts), p);
     }
-    private static string ToSql(ColumnDefinition c, FilterDefinition f, string p, DynamicParameters ps) { var col=SqlName.Identifier(c.ColumnName); switch(f.Operator) { case SearchOperator.Contains: ps.Add(p,$"%{f.Value}%"); return $"{col} LIKE @{p}"; case SearchOperator.StartsWith: ps.Add(p,$"{f.Value}%"); return $"{col} LIKE @{p}"; case SearchOperator.EndsWith: ps.Add(p,$"%{f.Value}"); return $"{col} LIKE @{p}"; case SearchOperator.Equals: ps.Add(p,f.Value); return $"{col} = @{p}"; case SearchOperator.In: ps.Add(p,f.Values); return $"{col} IN @{p}"; case SearchOperator.Between: ps.Add(p+"a",f.Value); ps.Add(p+"b",f.SecondValue); return $"{col} BETWEEN @{p}a AND @{p}b"; case SearchOperator.GreaterThan: ps.Add(p,f.Value); return $"{col} > @{p}"; case SearchOperator.LessThan: ps.Add(p,f.Value); return $"{col} < @{p}"; case SearchOperator.IsNull: return $"{col} IS NULL"; case SearchOperator.IsNotNull: return $"{col} IS NOT NULL"; default: throw new ArgumentOutOfRangeException(nameof(f)); } }
+    private static string ToSql(ColumnDefinition c, FilterDefinition f, string p, DynamicParameters ps) { var col=SqlName.Identifier(c.ColumnName); switch(f.Operator) { case SearchOperator.Contains: ps.Add(p,$"%{f.Value}%"); return $"{col} LIKE @{p}"; case SearchOperator.StartsWith: ps.Add(p,$"{f.Value}%"); return $"{col} LIKE @{p}"; case SearchOperator.EndsWith: ps.Add(p,$"%{f.Value}"); return $"{col} LIKE @{p}"; case SearchOperator.Equals: ps.Add(p,f.Value); return $"{col} = @{p}"; case SearchOperator.NotEquals: ps.Add(p,f.Value); return $"{col} <> @{p}"; case SearchOperator.In: ps.Add(p,f.Values); return $"{col} IN @{p}"; case SearchOperator.NotIn: ps.Add(p,f.Values); return $"{col} NOT IN @{p}"; case SearchOperator.Between: ps.Add(p+"a",f.Value); ps.Add(p+"b",f.SecondValue); return $"{col} BETWEEN @{p}a AND @{p}b"; case SearchOperator.GreaterThan: ps.Add(p,f.Value); return $"{col} > @{p}"; case SearchOperator.GreaterOrEqual: ps.Add(p,f.Value); return $"{col} >= @{p}"; case SearchOperator.LessThan: ps.Add(p,f.Value); return $"{col} < @{p}"; case SearchOperator.LessOrEqual: ps.Add(p,f.Value); return $"{col} <= @{p}"; case SearchOperator.IsNull: return $"{col} IS NULL"; case SearchOperator.IsNotNull: return $"{col} IS NOT NULL"; default: throw new ArgumentOutOfRangeException(nameof(f)); } }
 }

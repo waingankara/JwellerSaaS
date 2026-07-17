@@ -8,6 +8,9 @@ using Orion.Framework.Tenancy;
 using Orion.Framework.Authentication;
 using Orion.Framework.Authorization;
 using Orion.Framework.Identity;
+using Orion.Framework.Crud;
+using Orion.Framework.DomainEvents;
+using Orion.Framework.Validation;
 
 namespace Orion.Framework.DependencyInjection;
 
@@ -30,6 +33,12 @@ public static class OrionFrameworkServiceCollectionExtensions
         services.AddSingleton<ExistsBuilder>();
         services.AddSingleton<CountBuilder>();
         services.AddSingleton<DuplicateBuilder>();
+        services.AddSingleton<CrudSqlBuilder>();
+        services.AddScoped(typeof(ICrudService<>), typeof(CrudService<>));
+        services.AddScoped<ICrudPipeline, CrudPipeline>();
+        services.AddScoped<IDuplicateEngine, DuplicateEngine>();
+        services.AddSingleton<IDomainEventPublisher, NullDomainEventPublisher>();
+        services.AddSingleton<IValidationPipeline, NullValidationPipeline>();
         services.AddScoped<IAuditEngine, AuditEngine>();
         services.AddScoped<ITenantEngine, TenantEngine>();
         services.AddSingleton<IClaimsBuilder, ClaimsBuilder>();
