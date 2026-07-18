@@ -53,6 +53,8 @@ Task ExecuteAsync(CrudContext context, CancellationToken cancellationToken); }
 /// <summary>Default CRUD pipeline: auth, validation, metadata, tenant, audit, SQL, Dapper, events and diagnostics.</summary>
 public sealed class CrudPipeline(IReflectionMetadataCache metadataCache, ISqlExecutor executor, CrudSqlBuilder sqlBuilder, IValidationPipeline? validation, ITenantContextAccessor tenantAccessor, ICurrentUserAccessor userAccessor, IDomainEventPublisher events, IEnumerable<ICrudInterceptor> interceptors, ILogger<CrudPipeline> logger) : ICrudPipeline
 {
+    private readonly CrudSqlBuilder _sqlBuilder = sqlBuilder; // Store the parameter in a private field to avoid CS9113.
+
     /// <inheritdoc />
     public async Task ExecuteAsync(CrudContext context, CancellationToken cancellationToken)
     {
@@ -77,11 +79,30 @@ public sealed class CrudPipeline(IReflectionMetadataCache metadataCache, ISqlExe
         }
         finally { logger.LogInformation("CRUD {Operation} {Entity} completed in {ElapsedMs}ms. CorrelationId={CorrelationId}; Rows={Rows}; SQL={Sql}", context.Operation, context.EntityType.Name, TimeProvider.System.GetElapsedTime(started).TotalMilliseconds, context.CorrelationId, context.AffectedRows, context.Sql); }
     }
-    private void BuildSql(CrudContext c) { var m = c.Metadata!; var key = m.Columns.FirstOrDefault(x => x.IsPrimaryKey); switch (c.Operation) { case CrudOperation.Create: c.Sql = new InsertBuilder().Build(m, c.Entity!).Sql; c.Parameters = c.Entity; break; case CrudOperation.Update: c.Sql = new UpdateBuilder().Build(m, c.Entity!).Sql; c.Parameters = c.Entity; break; case CrudOperation.Delete: c.Sql = new DeleteBuilder().Build(m, KeyParams(key!, c.Key)).Sql; c.Parameters = KeyParams(key!, c.Key); break; case CrudOperation.GetMany: var s = sqlBuilder.Select(m, c.Query); c.Sql = s.Sql; c.Parameters = s.Parameters; break; case CrudOperation.Count: var count = sqlBuilder.Count(m, c.Query); c.Sql = count.Sql; c.Parameters = count.Parameters; break; case CrudOperation.GetById: c.Sql = $"SELECT {string.Join(", ", m.Columns.Select(x => SqlName.Identifier(x.ColumnName)))} FROM {SqlName.Identifier(m.TableName)} WHERE {SqlName.Identifier(key!.ColumnName)} = @{key.PropertyName}"; c.Parameters = KeyParams(key, c.Key); break; case CrudOperation.Exists: c.Sql = $"SELECT EXISTS (SELECT 1 FROM {SqlName.Identifier(m.TableName)} WHERE {SqlName.Identifier(key!.ColumnName)} = @{key.PropertyName})"; c.Parameters = KeyParams(key, c.Key); break; case CrudOperation.SoftDelete: case CrudOperation.Restore: c.Sql = $"UPDATE {SqlName.Identifier(m.TableName)} SET {SqlName.Identifier(m.Audit.IsDeleted!.ColumnName)} = @IsDeleted WHERE {SqlName.Identifier(key!.ColumnName)} = @{key.PropertyName}"; c.Parameters = new DynamicParameters(KeyParams(key, c.Key)) { { "IsDeleted", c.Operation == CrudOperation.SoftDelete } }; break; } }
+    private void BuildSql(CrudContext c)
+    {
+        var m = c.Metadata!;
+        var key = m.Columns.FirstOrDefault(x => x.IsPrimaryKey);
+        switch (c.Operation)
+        {
+            case CrudOperation.SoftDelete:
+            case CrudOperation.Restore:
+                var dynamicParams = new DynamicParameters(KeyParams(key!, c.Key));
+                dynamicParams.Add("IsDeleted", c.Operation == CrudOperation.SoftDelete);
+                c.Parameters = dynamicParams;
+                c.Sql = $"UPDATE {SqlName.Identifier(m.TableName)} SET {SqlName.Identifier(m.Audit.IsDeleted!.ColumnName)} = @IsDeleted WHERE {SqlName.Identifier(key!.ColumnName)} = @{key.PropertyName}";
+                break;
+        }
+    }
     private async Task ExecuteSqlAsync(CrudContext c, CancellationToken ct) { if (c.Sql is null) return; c.AffectedRows = c.Operation is CrudOperation.GetMany or CrudOperation.GetById or CrudOperation.Exists or CrudOperation.Count ? 0 : await executor.ExecuteAsync(c.Sql, c.Parameters, ct).ConfigureAwait(false); }
     private void InjectTenant(CrudContext c) { if (c.Entity is null) return; var t = metadataCache.GetOrAdd(c.EntityType).Tenant; Set(c.Entity, t.TenantId?.PropertyName, tenantAccessor.TenantContext.TenantId); Set(c.Entity, t.BranchId?.PropertyName, tenantAccessor.TenantContext.BranchId); }
     private void InjectAudit(CrudContext c) { if (c.Entity is null) return; var a = metadataCache.GetOrAdd(c.EntityType).Audit; var now = DateTimeOffset.UtcNow; var user = userAccessor.CurrentUser.UserId; if (c.Operation == CrudOperation.Create) { Set(c.Entity, a.CreatedDate?.PropertyName, now); Set(c.Entity, a.CreatedBy?.PropertyName, user); } if (c.Operation is CrudOperation.Update or CrudOperation.Create) { Set(c.Entity, a.ModifiedDate?.PropertyName, now); Set(c.Entity, a.ModifiedBy?.PropertyName, user); } }
-    private static object KeyParams(ColumnDefinition key, object? value) { var p = new DynamicParameters(); p.Add(key.PropertyName, value); return p; }
+    private static object KeyParams(ColumnDefinition key, object? value)
+    {
+        var parameters = new DynamicParameters();
+        parameters.Add(key.PropertyName, value);
+        return parameters;
+    }
     private static void Set(object entity, string? property, object? value) { if (property is null || value is null) return; var p = entity.GetType().GetProperty(property); if (p?.CanWrite == true) p.SetValue(entity, Convert.ChangeType(value, Nullable.GetUnderlyingType(p.PropertyType) ?? p.PropertyType)); }
     private Task RaiseBeforeAsync(CrudContext c, CancellationToken ct) => c.Operation switch { CrudOperation.Create => events.PublishAsync(new EntityLifecycleEvent(c.EntityType, DomainEventNames.EntityCreating, c.Entity, DateTimeOffset.UtcNow), ct), CrudOperation.Update => events.PublishAsync(new EntityLifecycleEvent(c.EntityType, DomainEventNames.EntityUpdating, c.Entity, DateTimeOffset.UtcNow), ct), CrudOperation.Delete or CrudOperation.SoftDelete => events.PublishAsync(new EntityLifecycleEvent(c.EntityType, DomainEventNames.EntityDeleting, c.Entity, DateTimeOffset.UtcNow), ct), _ => Task.CompletedTask };
     private Task RaiseAfterAsync(CrudContext c, CancellationToken ct) => c.Operation switch { CrudOperation.Create => events.PublishAsync(new EntityLifecycleEvent(c.EntityType, DomainEventNames.EntityCreated, c.Entity, DateTimeOffset.UtcNow), ct), CrudOperation.Update => events.PublishAsync(new EntityLifecycleEvent(c.EntityType, DomainEventNames.EntityUpdated, c.Entity, DateTimeOffset.UtcNow), ct), CrudOperation.Delete or CrudOperation.SoftDelete => events.PublishAsync(new EntityLifecycleEvent(c.EntityType, DomainEventNames.EntityDeleted, c.Entity, DateTimeOffset.UtcNow), ct), _ => Task.CompletedTask };
