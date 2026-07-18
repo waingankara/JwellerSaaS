@@ -3,6 +3,9 @@ using Orion.Framework.Metadata.Attributes;
 using Orion.Framework.Pagination;
 using Orion.Framework.Search;
 using Orion.Framework.Sql;
+using Xunit;
+using FilterDefinition = Orion.Framework.Query.FilterDefinition;
+
 
 namespace JwellerSaaS.UnitTests.OrionFramework;
 
@@ -37,9 +40,9 @@ public sealed class FrameworkCoreTests
         var insert = new InsertBuilder().Build(definition, new { Id = 1L, Name = "A" });
         var update = new UpdateBuilder().Build(definition, new { Id = 1L, Name = "A" });
         var duplicate = new DuplicateBuilder().Build(definition, new { Name = "A" });
-        Assert.Contains("@Name", insert.CommandText, StringComparison.Ordinal);
-        Assert.Contains("WHERE id = @Id", update.CommandText, StringComparison.Ordinal);
-        Assert.Contains("name = @Name", duplicate.CommandText, StringComparison.Ordinal);
+        Assert.Contains("@Name", insert.Sql, StringComparison.Ordinal);
+        Assert.Contains("WHERE id = @Id", update.Sql, StringComparison.Ordinal);
+        Assert.Contains("name = @Name", duplicate.Sql, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -47,14 +50,14 @@ public sealed class FrameworkCoreTests
     {
         var definition = new ReflectionMetadataCache().GetOrAdd<TestMaster>();
         var statement = new SearchBuilder().Build(definition, new[] { new FilterDefinition(nameof(TestMaster.Name), SearchOperator.Contains, "gold") });
-        Assert.Equal("WHERE name LIKE @p0", statement.CommandText);
+        Assert.Equal("WHERE name LIKE @p0", statement.Sql);
         Assert.NotNull(statement.Parameters);
     }
 
     [Fact]
     public void PaginationCalculatesOffsetAndTotalPages()
     {
-        var request = new PagedRequest(3, 25, Array.Empty<SortDefinition>(), Array.Empty<FilterDefinition>());
+        var request = new PagedRequest(3, 25, Array.Empty<SortDefinition>(), Array.Empty<Orion.Framework.Pagination.FilterDefinition>());
         var result = new PagedResult<int>(new[] { 1 }, 101, request.PageNumber, request.PageSize);
         Assert.Equal(50, request.Offset);
         Assert.Equal(5, result.TotalPages);
