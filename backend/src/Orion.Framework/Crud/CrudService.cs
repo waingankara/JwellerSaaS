@@ -78,6 +78,8 @@ public sealed class CrudPipeline(
     IEnumerable<ICrudInterceptor> interceptors,
     ILogger<CrudPipeline> logger) : ICrudPipeline
 {
+    private readonly CrudSqlBuilder _sqlBuilder = sqlBuilder; // Store the parameter in a private field to avoid CS9113.
+
     /// <inheritdoc />
     public async Task ExecuteAsync(CrudContext context, CancellationToken cancellationToken)
     {

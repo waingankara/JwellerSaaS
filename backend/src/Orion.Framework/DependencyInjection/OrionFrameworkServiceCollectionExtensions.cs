@@ -46,7 +46,7 @@ public static class OrionFrameworkServiceCollectionExtensions
         services.AddSingleton<ITokenValidator, JwtTokenValidator>();
         services.AddScoped<IPermissionService, PermissionService>();
         services.AddScoped<IOrionAuthorizationService, OrionAuthorizationService>();
-        services.AddSingleton<IAuthorizationHandler, PermissionHandler>();
+        services.AddScoped<IAuthorizationHandler, PermissionHandler>();
         services.AddSingleton<IPasswordHasher, MicrosoftPasswordHasher>();
         services.AddSingleton<IPasswordHistoryValidator, PasswordHistoryValidator>();
         services.AddScoped<HeaderTenantResolver>();
