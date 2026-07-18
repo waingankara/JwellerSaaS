@@ -1,3 +1,4 @@
+using JwellerSaaS.Application.Masters;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JwellerSaaS.Application.DependencyInjection;
@@ -6,5 +7,5 @@ namespace JwellerSaaS.Application.DependencyInjection;
 public static class ApplicationServiceCollectionExtensions
 {
     /// <summary>Adds application-layer dependencies.</summary>
-    public static IServiceCollection AddApplicationServices(this IServiceCollection services) => services;
+    public static IServiceCollection AddApplicationServices(this IServiceCollection services) => services.AddScoped<ICategoryBusinessService, CategoryBusinessService>();
 }

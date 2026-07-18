@@ -55,6 +55,7 @@ builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices();
 
 var app = builder.Build();
+app.Services.RegisterBusinessMasters();
 
 app.UseSerilogRequestLogging();
 app.UseMiddleware<GlobalExceptionMiddleware>();

@@ -5,6 +5,7 @@ using Orion.Framework.DomainEvents;
 using Orion.Framework.Interceptors;
 using Orion.Framework.Metadata;
 using Orion.Framework.Query;
+using Orion.Framework.Search;
 using Orion.Framework.Security;
 using Orion.Framework.Sql;
 using Orion.Framework.Tenancy;
@@ -162,37 +163,37 @@ public sealed class CrudPipeline(
                 context.Parameters = context.Entity;
                 break;
             case CrudOperation.Delete:
-                context.Sql = new DeleteBuilder().Build(metadata, KeyParams(key, context.Key)).Sql;
-                context.Parameters = KeyParams(key, context.Key);
+                context.Sql = new DeleteBuilder().Build(metadata, KeyParamsWithTenant(metadata, key, context.Key, tenantAccessor.TenantContext.TenantId)).Sql;
+                context.Parameters = KeyParamsWithTenant(metadata, key, context.Key, tenantAccessor.TenantContext.TenantId);
                 break;
             case CrudOperation.GetMany:
-                var select = sqlBuilder.Select(metadata, context.Query);
+                var select = sqlBuilder.Select(metadata, AddTenantFilter(metadata, context.Query, tenantAccessor.TenantContext.TenantId));
                 context.Sql = select.Sql;
                 context.Parameters = select.Parameters;
                 break;
             case CrudOperation.Count:
-                var count = sqlBuilder.Count(metadata, context.Query);
+                var count = sqlBuilder.Count(metadata, AddTenantFilter(metadata, context.Query, tenantAccessor.TenantContext.TenantId));
                 context.Sql = count.Sql;
                 context.Parameters = count.Parameters;
                 break;
             case CrudOperation.GetById:
-                context.Sql = $"SELECT {ColumnList(metadata)} FROM {SqlName.Identifier(metadata.TableName)} WHERE {SqlName.Identifier(key.ColumnName)} = @{key.PropertyName}";
-                context.Parameters = KeyParams(key, context.Key);
+                context.Sql = $"SELECT {ColumnList(metadata)} FROM {SqlName.Identifier(metadata.TableName)} WHERE {KeyAndTenantPredicate(metadata, key)}";
+                context.Parameters = KeyParamsWithTenant(metadata, key, context.Key, tenantAccessor.TenantContext.TenantId);
                 break;
             case CrudOperation.Exists:
-                context.Sql = $"SELECT EXISTS (SELECT 1 FROM {SqlName.Identifier(metadata.TableName)} WHERE {SqlName.Identifier(key.ColumnName)} = @{key.PropertyName})";
-                context.Parameters = KeyParams(key, context.Key);
+                context.Sql = $"SELECT EXISTS (SELECT 1 FROM {SqlName.Identifier(metadata.TableName)} WHERE {KeyAndTenantPredicate(metadata, key)})";
+                context.Parameters = KeyParamsWithTenant(metadata, key, context.Key, tenantAccessor.TenantContext.TenantId);
                 break;
             case CrudOperation.SoftDelete:
             case CrudOperation.Restore:
-                BuildSoftDeleteSql(context, metadata, key, userAccessor.CurrentUser.UserId);
+                BuildSoftDeleteSql(context, metadata, key, userAccessor.CurrentUser.UserId, tenantAccessor.TenantContext.TenantId);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(context), context.Operation, "Unsupported CRUD operation.");
         }
     }
 
-    private static void BuildSoftDeleteSql(CrudContext context, MasterDefinition metadata, ColumnDefinition key, long? currentUserId)
+    private static void BuildSoftDeleteSql(CrudContext context, MasterDefinition metadata, ColumnDefinition key, long? currentUserId, long? tenantId)
     {
         var deletedColumn = metadata.Audit.IsDeleted
             ?? throw new InvalidOperationException($"Entity {metadata.EntityType.Name} does not define an IsDeleted audit column.");
@@ -213,7 +214,13 @@ public sealed class CrudPipeline(
             parameters.Add("DeletedBy", isDeleted ? currentUserId : null);
         }
 
-        context.Sql = $"UPDATE {SqlName.Identifier(metadata.TableName)} SET {string.Join(", ", assignments)} WHERE {SqlName.Identifier(key.ColumnName)} = @{key.PropertyName}";
+        var tenantPredicate = metadata.Tenant.TenantId is null ? string.Empty : $" AND {SqlName.Identifier(metadata.Tenant.TenantId.ColumnName)} = @TenantId";
+        if (metadata.Tenant.TenantId is not null)
+        {
+            parameters.Add("TenantId", tenantId);
+        }
+
+        context.Sql = $"UPDATE {SqlName.Identifier(metadata.TableName)} SET {string.Join(", ", assignments)} WHERE {SqlName.Identifier(key.ColumnName)} = @{key.PropertyName}{tenantPredicate}";
         context.Parameters = parameters;
     }
 
@@ -280,6 +287,38 @@ public sealed class CrudPipeline(
         CrudOperation.Restore => events.PublishAsync(new EntityLifecycleEvent(context.EntityType, DomainEventNames.EntityRestored, context.Entity, DateTimeOffset.UtcNow), cancellationToken),
         _ => Task.CompletedTask,
     };
+
+
+
+    private static QueryDefinition AddTenantFilter(MasterDefinition metadata, QueryDefinition? query, long? tenantId)
+    {
+        var actual = query ?? QueryDefinition.Empty;
+        if (metadata.Tenant.TenantId is null || tenantId is null)
+        {
+            return actual;
+        }
+
+        var filters = (actual.Filters ?? Array.Empty<FilterDefinition>()).ToList();
+        filters.Add(new FilterDefinition(metadata.Tenant.TenantId.PropertyName, SearchOperator.Equals, tenantId.Value));
+        return actual with { Filters = filters };
+    }
+
+    private static string KeyAndTenantPredicate(MasterDefinition metadata, ColumnDefinition key)
+    {
+        var predicate = $"{SqlName.Identifier(key.ColumnName)} = @{key.PropertyName}";
+        return metadata.Tenant.TenantId is null ? predicate : $"{predicate} AND {SqlName.Identifier(metadata.Tenant.TenantId.ColumnName)} = @TenantId";
+    }
+
+    private static object KeyParamsWithTenant(MasterDefinition metadata, ColumnDefinition key, object? value, long? tenantId)
+    {
+        var parameters = new DynamicParameters(KeyParams(key, value));
+        if (metadata.Tenant.TenantId is not null)
+        {
+            parameters.Add("TenantId", tenantId);
+        }
+
+        return parameters;
+    }
 
     private static string ColumnList(MasterDefinition metadata) => string.Join(", ", metadata.Columns.Select(column => SqlName.Identifier(column.ColumnName)));
 
