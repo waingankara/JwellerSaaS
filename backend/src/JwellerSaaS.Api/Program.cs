@@ -77,3 +77,5 @@ app.MapControllers();
 app.MapHealthChecks("/health");
 
 await app.RunAsync().ConfigureAwait(false);
+
+public partial class Program;
