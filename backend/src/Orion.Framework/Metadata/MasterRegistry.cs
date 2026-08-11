@@ -12,4 +12,7 @@ public sealed class MasterRegistry(IReflectionMetadataCache metadataCache) : IMa
 
     /// <inheritdoc />
     public MasterDefinition Get<T>() where T : class => definitions.TryGetValue(typeof(T), out var definition) ? definition : Register<T>();
+
+    /// <inheritdoc />
+    public IReadOnlyCollection<MasterDefinition> GetAll() => definitions.Values.ToArray();
 }

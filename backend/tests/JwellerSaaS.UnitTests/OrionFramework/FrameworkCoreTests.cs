@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Hosting;
+using Orion.Framework.Diagnostics;
 using Orion.Framework.Metadata;
 using Orion.Framework.Metadata.Attributes;
 using Orion.Framework.Pagination;
@@ -5,7 +7,6 @@ using Orion.Framework.Search;
 using Orion.Framework.Sql;
 using Xunit;
 using FilterDefinition = Orion.Framework.Query.FilterDefinition;
-
 
 namespace JwellerSaaS.UnitTests.OrionFramework;
 
@@ -22,6 +23,36 @@ public sealed class FrameworkCoreTests
         Assert.NotNull(definition.Tenant.TenantId);
         Assert.Single(definition.Search.Columns);
         Assert.Single(definition.Duplicate.Columns);
+    }
+
+    [Fact]
+    public void MetadataRegistryReturnsAllRegisteredMasters()
+    {
+        var registry = new MasterRegistry(new ReflectionMetadataCache());
+        registry.Register<TestMaster>();
+
+        var definitions = registry.GetAll();
+
+        Assert.Single(definitions);
+        Assert.Equal("TestMaster", definitions.Single().EntityName);
+    }
+
+    [Fact]
+    public void DiagnosticsSnapshotContainsRegisteredMasterMetadata()
+    {
+        var registry = new MasterRegistry(new ReflectionMetadataCache());
+        registry.Register<TestMaster>();
+        var service = new OrionDiagnosticsService(registry, new TestHostEnvironment());
+
+        var snapshot = service.GetSnapshot();
+
+        var master = Assert.Single(snapshot.Masters);
+        Assert.Equal("Orion Framework", snapshot.Framework);
+        Assert.Equal("Development", snapshot.EnvironmentName);
+        Assert.Equal("test_masters", master.TableName);
+        Assert.Contains("name", master.SearchColumns);
+        Assert.Contains("name", master.DuplicateColumns);
+        Assert.Equal("TenantId", master.TenantColumn);
     }
 
     [Fact]
@@ -79,5 +110,13 @@ public sealed class FrameworkCoreTests
         public DateTime CreatedDate { get; init; }
         [IgnoreColumn]
         public string Ignored { get; init; } = string.Empty;
+    }
+
+    private sealed class TestHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = "Development";
+        public string ApplicationName { get; set; } = "Tests";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } = new Microsoft.Extensions.FileProviders.NullFileProvider();
     }
 }
