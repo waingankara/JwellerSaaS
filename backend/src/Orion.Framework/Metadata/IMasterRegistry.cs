@@ -17,9 +17,9 @@ public interface IMasterRegistry
     /// <summary>Gets metadata for a previously registered master entity type.</summary>
     MasterDefinition Get<T>() where T : class;
 
-    /// <summary>Attempts to get metadata by entity name case-insensitively.</summary>
-    bool TryGetByEntityName(string entityName, out MasterDefinition? definition);
+    /// <summary>Gets metadata for a previously registered master entity name or table name.</summary>
+    MasterDefinition? Find(string name);
 
-    /// <summary>Gets all registered master metadata definitions.</summary>
-    IReadOnlyCollection<MasterDefinition> GetAll();
+    /// <summary>Gets all registered master definitions.</summary>
+    IReadOnlyCollection<MasterDefinition> All { get; }
 }
