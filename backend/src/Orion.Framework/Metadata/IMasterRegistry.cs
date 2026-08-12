@@ -8,4 +8,10 @@ public interface IMasterRegistry
 
     /// <summary>Gets metadata for a previously registered master entity type.</summary>
     MasterDefinition Get<T>() where T : class;
+
+    /// <summary>Gets metadata for a previously registered master entity name or table name.</summary>
+    MasterDefinition? Find(string name);
+
+    /// <summary>Gets all registered master definitions.</summary>
+    IReadOnlyCollection<MasterDefinition> All { get; }
 }
