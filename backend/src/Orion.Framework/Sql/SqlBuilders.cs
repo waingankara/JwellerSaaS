@@ -3,6 +3,7 @@ using Orion.Framework.Metadata;
 using Orion.Framework.Pagination;
 using Orion.Framework.Search;
 using Orion.Framework.Query;
+using FilterDefinition = Orion.Framework.Query.FilterDefinition;
 
 namespace Orion.Framework.Sql;
 

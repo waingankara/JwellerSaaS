@@ -1,3 +1,8 @@
+using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Orion.Framework.DependencyInjection;
+using Orion.Framework.Diagnostics;
 using Orion.Framework.Metadata;
 using Orion.Framework.Metadata.Attributes;
 using Orion.Framework.Pagination;
@@ -24,6 +29,82 @@ public sealed class FrameworkCoreTests
     }
 
     [Fact]
+    public void MetadataDiscoveryRegistersMastersFromAssembly()
+    {
+        var registry = new MasterRegistry(new ReflectionMetadataCache());
+        var definitions = registry.DiscoverFromAssemblies(new[] { typeof(TestMaster).Assembly });
+        Assert.Contains(definitions, definition => definition.EntityName == nameof(TestMaster));
+        Assert.Contains(registry.GetAll(), definition => definition.EntityName == nameof(TestMaster));
+    }
+
+    [Fact]
+    public void MetadataRegistryLookupIsCaseInsensitive()
+    {
+        var registry = new MasterRegistry(new ReflectionMetadataCache());
+        registry.DiscoverFromAssemblies(new[] { typeof(TestMaster).Assembly });
+        Assert.True(registry.TryGetByEntityName("testmaster", out var definition));
+        Assert.Equal(nameof(TestMaster), definition?.EntityName);
+    }
+
+    [Fact]
+    public void MetadataRegistryUnknownLookupReturnsFalse()
+    {
+        var registry = new MasterRegistry(new ReflectionMetadataCache());
+        Assert.False(registry.TryGetByEntityName("missing", out var definition));
+        Assert.Null(definition);
+    }
+
+    [Fact]
+    public void MetadataRegistryDetectsDuplicateEntityNames()
+    {
+        var registry = new MasterRegistry(new ReflectionMetadataCache());
+        registry.Register(typeof(DuplicateNameOne));
+        var exception = Assert.Throws<InvalidOperationException>(() => registry.Register(typeof(DuplicateNameONE)));
+        Assert.Contains("Duplicate Orion master entity name", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MetadataRegistryDetectsInvalidMetadata()
+    {
+        var registry = new MasterRegistry(new ReflectionMetadataCache());
+        var exception = Assert.Throws<InvalidOperationException>(() => registry.Register(typeof(InvalidMaster)));
+        Assert.Contains("primary key", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void MetadataRegistryDetectsDuplicateTableNames()
+    {
+        var registry = new MasterRegistry(new ReflectionMetadataCache());
+        registry.Register(typeof(DuplicateTableOne));
+        var exception = Assert.Throws<InvalidOperationException>(() => registry.Register(typeof(DuplicateTableTwo)));
+        Assert.Contains("Duplicate Orion master table name", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DiagnosticsSnapshotContainsRegisteredMasterMetadata()
+    {
+        var registry = new MasterRegistry(new ReflectionMetadataCache());
+        registry.Register<TestMaster>();
+        var service = new OrionDiagnosticsService(registry, new TestHostEnvironment());
+        var snapshot = service.GetSnapshot();
+        var master = Assert.Single(snapshot.Entities);
+        Assert.Equal("Orion Framework", snapshot.Framework);
+        Assert.Equal("Development", snapshot.Environment);
+        Assert.Equal(1, snapshot.EntityCount);
+        Assert.Equal("test_masters", master.TableName);
+        Assert.Contains("name", master.SearchableColumns);
+        Assert.Contains("name", master.DuplicateColumns);
+        Assert.Equal("TenantId", master.TenantColumn);
+    }
+
+    [Fact]
+    public void ServiceProviderBuildsWithScopeValidation()
+    {
+        using var provider = new ServiceCollection().AddLogging().AddOrionFramework().BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+        Assert.NotNull(provider.GetRequiredService<IMasterRegistry>());
+    }
+
+    [Fact]
     public void ReflectionCacheReturnsSameDefinitionInstance()
     {
         var cache = new ReflectionMetadataCache();
@@ -39,9 +120,9 @@ public sealed class FrameworkCoreTests
         var insert = new InsertBuilder().Build(definition, new { Id = 1L, Name = "A" });
         var update = new UpdateBuilder().Build(definition, new { Id = 1L, Name = "A" });
         var duplicate = new DuplicateBuilder().Build(definition, new { Name = "A" });
-        Assert.Contains("@Name", insert.CommandText, StringComparison.Ordinal);
-        Assert.Contains("WHERE id = @Id", update.CommandText, StringComparison.Ordinal);
-        Assert.Contains("name = @Name", duplicate.CommandText, StringComparison.Ordinal);
+        Assert.Contains("@Name", insert.Sql, StringComparison.Ordinal);
+        Assert.Contains("WHERE id = @Id", update.Sql, StringComparison.Ordinal);
+        Assert.Contains("name = @Name", duplicate.Sql, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -56,14 +137,14 @@ public sealed class FrameworkCoreTests
     [Fact]
     public void PaginationCalculatesOffsetAndTotalPages()
     {
-        var request = new PagedRequest(3, 25, Array.Empty<SortDefinition>(), Array.Empty<FilterDefinition>());
+        var request = new PagedRequest(3, 25, Array.Empty<SortDefinition>(), Array.Empty<Orion.Framework.Pagination.FilterDefinition>());
         var result = new PagedResult<int>(new[] { 1 }, 101, request.PageNumber, request.PageSize);
         Assert.Equal(50, request.Offset);
         Assert.Equal(5, result.TotalPages);
     }
 
     [Master("test_masters")]
-    private sealed class TestMaster
+    public sealed class TestMaster
     {
         [PrimaryKey]
         [DbColumn("id")]
@@ -78,5 +159,27 @@ public sealed class FrameworkCoreTests
         public DateTime CreatedDate { get; init; }
         [IgnoreColumn]
         public string Ignored { get; init; } = string.Empty;
+    }
+
+    private sealed class InvalidMaster { public string Name { get; init; } = string.Empty; }
+
+    [Master("duplicate_name_one")]
+    private sealed class DuplicateNameOne { [PrimaryKey] public long Id { get; init; } }
+
+    [Master("duplicate_name_two")]
+    private sealed class DuplicateNameONE { [PrimaryKey] public long Id { get; init; } }
+
+    [Master("duplicate_table")]
+    private sealed class DuplicateTableOne { [PrimaryKey] public long Id { get; init; } }
+
+    [Master("DUPLICATE_TABLE")]
+    private sealed class DuplicateTableTwo { [PrimaryKey] public long Id { get; init; } }
+
+    private sealed class TestHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = "Development";
+        public string ApplicationName { get; set; } = "Tests";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } = new Microsoft.Extensions.FileProviders.NullFileProvider();
     }
 }

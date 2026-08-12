@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Orion.Framework.Security;
 
@@ -46,11 +47,23 @@ public sealed class PermissionRequirement(string permission) : IAuthorizationReq
     public string Permission { get; } = permission;
 }
 
-public sealed class PermissionHandler(ICurrentUserAccessor currentUserAccessor, IPermissionService permissionService) : AuthorizationHandler<PermissionRequirement>
+public sealed class PermissionHandler(IPermissionService permissionService) : AuthorizationHandler<PermissionRequirement>
 {
     protected override async Task HandleRequirementAsync(AuthorizationHandlerContext context, PermissionRequirement requirement)
     {
-        var allowed = await permissionService.HasPermissionAsync(currentUserAccessor.CurrentUser, requirement.Permission, CancellationToken.None).ConfigureAwait(false);
+        var user = CurrentUserFromPrincipal(context.User);
+        var allowed = await permissionService.HasPermissionAsync(user, requirement.Permission, CancellationToken.None).ConfigureAwait(false);
         if (allowed) context.Succeed(requirement);
+    }
+
+    private static CurrentUser CurrentUserFromPrincipal(ClaimsPrincipal principal)
+    {
+        var id = principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub") ?? string.Empty;
+        var email = principal.FindFirstValue(ClaimTypes.Email) ?? principal.FindFirstValue("email") ?? string.Empty;
+        var tenantId = long.TryParse(principal.FindFirstValue("tenant_id"), out var parsedTenantId) ? parsedTenantId : 0L;
+        var branchId = long.TryParse(principal.FindFirstValue("branch_id"), out var parsedBranchId) ? parsedBranchId : null;
+        var roles = principal.FindAll(ClaimTypes.Role).Select(claim => claim.Value).Concat(principal.FindAll("role").Select(claim => claim.Value)).ToArray();
+        var permissions = principal.FindAll("permission").Select(claim => claim.Value).Concat(principal.FindAll("permissions").Select(claim => claim.Value)).ToArray();
+        return new CurrentUser(long.TryParse(id, out var parsedUserId) ? parsedUserId : null, email, email, tenantId == 0L ? null : tenantId, branchId, roles.ToHashSet(StringComparer.Ordinal), permissions.ToHashSet(StringComparer.Ordinal), null, null);
     }
 }
