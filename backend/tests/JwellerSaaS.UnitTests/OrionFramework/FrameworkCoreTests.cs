@@ -3,6 +3,8 @@ using Orion.Framework.Metadata.Attributes;
 using Orion.Framework.Pagination;
 using Orion.Framework.Search;
 using Orion.Framework.Sql;
+using Xunit;
+
 
 namespace JwellerSaaS.UnitTests.OrionFramework;
 
@@ -46,7 +48,7 @@ public sealed class FrameworkCoreTests
     public void SearchBuilderSupportsOperators()
     {
         var definition = new ReflectionMetadataCache().GetOrAdd<TestMaster>();
-        var statement = new SearchBuilder().Build(definition, new[] { new FilterDefinition(nameof(TestMaster.Name), SearchOperator.Contains, "gold") });
+        var statement = new SearchBuilder().Build(definition, new[] { new Orion.Framework.Query.FilterDefinition(nameof(TestMaster.Name), SearchOperator.Contains, "gold") });
         Assert.Equal("WHERE name LIKE @p0", statement.CommandText);
         Assert.NotNull(statement.Parameters);
     }

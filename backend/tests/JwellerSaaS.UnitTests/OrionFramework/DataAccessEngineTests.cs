@@ -20,9 +20,9 @@ public sealed class DataAccessEngineTests
             new QueryOptions(Offset: 20, PageSize: 10),
             new SearchOptions("sku", new[] { nameof(TestEntity.Code) })));
 
-        Assert.Contains("LIKE @p0", statement.Sql);
-        Assert.Contains("ORDER BY \"Name\" DESC", statement.Sql);
-        Assert.Contains("LIMIT @PageSize OFFSET @Offset", statement.Sql);
+        Assert.Contains("LIKE @p0", statement.CommandText);
+        Assert.Contains("ORDER BY \"Name\" DESC", statement.CommandText);
+        Assert.Contains("LIMIT @PageSize OFFSET @Offset", statement.CommandText);
     }
 
     [Fact]
@@ -31,7 +31,7 @@ public sealed class DataAccessEngineTests
         var metadata = new ReflectionMetadataCache().GetOrAdd<TestEntity>();
         var statement = new CrudSqlBuilder().Select(metadata, new QueryDefinition(Options: new QueryOptions(Distinct: true, Top: 1, Columns: new[] { nameof(TestEntity.Name), nameof(TestEntity.Code) })));
 
-        Assert.StartsWith("SELECT DISTINCT \"Name\" FROM", statement.Sql);
+        Assert.StartsWith("SELECT DISTINCT \"Name\" FROM", statement.CommandText);
     }
 
     [Fact]
