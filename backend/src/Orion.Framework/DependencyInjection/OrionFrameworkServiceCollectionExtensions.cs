@@ -11,6 +11,7 @@ using Orion.Framework.Identity;
 using Orion.Framework.Crud;
 using Orion.Framework.DomainEvents;
 using Orion.Framework.Validation;
+using Orion.Framework.Diagnostics;
 
 namespace Orion.Framework.DependencyInjection;
 
@@ -44,11 +45,13 @@ public static class OrionFrameworkServiceCollectionExtensions
         services.AddSingleton<IClaimsBuilder, ClaimsBuilder>();
         services.AddSingleton<ITokenGenerator, JwtTokenGenerator>();
         services.AddSingleton<ITokenValidator, JwtTokenValidator>();
-        services.AddScoped<IPermissionService, PermissionService>();
+        services.AddSingleton<IPermissionService, PermissionService>();
         services.AddScoped<IOrionAuthorizationService, OrionAuthorizationService>();
-        services.AddSingleton<IAuthorizationHandler, PermissionHandler>();
+        services.AddScoped<IAuthorizationHandler, PermissionHandler>();
         services.AddSingleton<IPasswordHasher, MicrosoftPasswordHasher>();
         services.AddSingleton<IPasswordHistoryValidator, PasswordHistoryValidator>();
+        services.AddSingleton<IOrionDiagnosticsService, OrionDiagnosticsService>();
+        services.AddHostedService<OrionMetadataDiscoveryHostedService>();
         services.AddScoped<HeaderTenantResolver>();
         services.AddScoped<ITenantResolver>(provider => new CompositeTenantResolver(new ITenantResolver[] { provider.GetRequiredService<HeaderTenantResolver>() }));
         return services;
