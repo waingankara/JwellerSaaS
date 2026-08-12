@@ -155,25 +155,25 @@ public sealed class CrudPipeline(
         switch (context.Operation)
         {
             case CrudOperation.Create:
-                context.Sql = new InsertBuilder().Build(metadata, context.Entity!).Sql;
+                context.Sql = new InsertBuilder().Build(metadata, context.Entity!).CommandText;
                 context.Parameters = context.Entity;
                 break;
             case CrudOperation.Update:
-                context.Sql = new UpdateBuilder().Build(metadata, context.Entity!).Sql;
+                context.Sql = new UpdateBuilder().Build(metadata, context.Entity!).CommandText;
                 context.Parameters = context.Entity;
                 break;
             case CrudOperation.Delete:
-                context.Sql = new DeleteBuilder().Build(metadata, KeyParamsWithTenant(metadata, key, context.Key, tenantAccessor.TenantContext.TenantId)).Sql;
+                context.Sql = new DeleteBuilder().Build(metadata, KeyParamsWithTenant(metadata, key, context.Key, tenantAccessor.TenantContext.TenantId)).CommandText;
                 context.Parameters = KeyParamsWithTenant(metadata, key, context.Key, tenantAccessor.TenantContext.TenantId);
                 break;
             case CrudOperation.GetMany:
                 var select = sqlBuilder.Select(metadata, AddTenantFilter(metadata, context.Query, tenantAccessor.TenantContext.TenantId));
-                context.Sql = select.Sql;
+                context.Sql = select.CommandText;
                 context.Parameters = select.Parameters;
                 break;
             case CrudOperation.Count:
                 var count = sqlBuilder.Count(metadata, AddTenantFilter(metadata, context.Query, tenantAccessor.TenantContext.TenantId));
-                context.Sql = count.Sql;
+                context.Sql = count.CommandText;
                 context.Parameters = count.Parameters;
                 break;
             case CrudOperation.GetById:
