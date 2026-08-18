@@ -54,8 +54,15 @@ builder.Services.AddAuthorization();
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices();
 
+Console.WriteLine("========== BEFORE BUILD ==========");
+
 var app = builder.Build();
+
+Console.WriteLine("========== AFTER BUILD ==========");
+
 app.Services.RegisterBusinessMasters();
+
+Console.WriteLine("========== AFTER REGISTER BUSINESS MASTERS ==========");
 
 app.UseSerilogRequestLogging();
 app.UseMiddleware<GlobalExceptionMiddleware>();
@@ -63,11 +70,9 @@ app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseExceptionHandler();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 app.UseMiddleware<TenantMiddleware>();
