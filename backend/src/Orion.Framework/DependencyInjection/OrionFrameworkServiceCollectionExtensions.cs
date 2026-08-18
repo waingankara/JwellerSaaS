@@ -36,6 +36,7 @@ public static class OrionFrameworkServiceCollectionExtensions
         services.AddSingleton<DuplicateBuilder>();
         services.AddSingleton<CrudSqlBuilder>();
         services.AddScoped(typeof(ICrudService<>), typeof(CrudService<>));
+        services.AddScoped<IGenericMasterCrudService, GenericMasterCrudService>();
         services.AddScoped<ICrudPipeline, CrudPipeline>();
         services.AddScoped<IDuplicateEngine, DuplicateEngine>();
         services.AddSingleton<IDomainEventPublisher, NullDomainEventPublisher>();
