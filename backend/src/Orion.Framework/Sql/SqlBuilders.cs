@@ -1,48 +1,389 @@
 using Dapper;
 using Orion.Framework.Metadata;
 using Orion.Framework.Pagination;
-using Orion.Framework.Search;
 using Orion.Framework.Query;
+using Orion.Framework.Search;
+
 using FilterDefinition = Orion.Framework.Query.FilterDefinition;
 
 namespace Orion.Framework.Sql;
 
-/// <summary>Builds parameterized insert statements.</summary>
-public sealed class InsertBuilder { public SqlStatement Build(MasterDefinition d, object values) { var cols=d.Columns.Where(c=>!c.IsPrimaryKey).ToArray(); return new SqlStatement($"INSERT INTO {SqlName.Identifier(d.TableName)} ({string.Join(", ", cols.Select(c=>SqlName.Identifier(c.ColumnName)))}) VALUES ({string.Join(", ", cols.Select(c=>"@"+c.PropertyName))})", values); } }
-/// <summary>Builds parameterized update statements.</summary>
-public sealed class UpdateBuilder { public SqlStatement Build(MasterDefinition d, object values) { var key=d.Columns.First(c=>c.IsPrimaryKey); var cols=d.Columns.Where(c=>!c.IsPrimaryKey).ToArray(); var tenant=d.Tenant.TenantId is null ? string.Empty : $" AND {SqlName.Identifier(d.Tenant.TenantId.ColumnName)} = @{d.Tenant.TenantId.PropertyName}"; return new SqlStatement($"UPDATE {SqlName.Identifier(d.TableName)} SET {string.Join(", ", cols.Select(c=>$"{SqlName.Identifier(c.ColumnName)} = @{c.PropertyName}"))} WHERE {SqlName.Identifier(key.ColumnName)} = @{key.PropertyName}{tenant}", values); } }
-/// <summary>Builds parameterized delete statements.</summary>
-public sealed class DeleteBuilder { public SqlStatement Build(MasterDefinition d, object parameters) { var key=d.Columns.First(c=>c.IsPrimaryKey); var tenant=d.Tenant.TenantId is null ? string.Empty : $" AND {SqlName.Identifier(d.Tenant.TenantId.ColumnName)} = @TenantId"; return new SqlStatement($"DELETE FROM {SqlName.Identifier(d.TableName)} WHERE {SqlName.Identifier(key.ColumnName)} = @{key.PropertyName}{tenant}", parameters); } }
-/// <summary>Builds parameterized select statements.</summary>
+/// <summary>
+/// Builds parameterized INSERT statements.
+/// </summary>
+public sealed class InsertBuilder
+{
+    /// <summary>
+    /// Builds an INSERT statement using the supplied master metadata.
+    /// </summary>
+    public SqlStatement Build(
+        MasterDefinition definition,
+        object values)
+    {
+        var columns = definition.Columns
+            .Where(column => !column.IsPrimaryKey)
+            .ToArray();
+
+        var columnNames = string.Join(
+            ", ",
+            columns.Select(column =>
+                SqlName.Identifier(column.ColumnName)));
+
+        var parameterNames = string.Join(
+            ", ",
+            columns.Select(column =>
+                $"@{column.PropertyName}"));
+
+        var sql =
+            $"INSERT INTO {SqlName.Identifier(definition.TableName)} " +
+            $"({columnNames}) " +
+            $"VALUES ({parameterNames})";
+
+        return new SqlStatement(sql, values);
+    }
+}
+
+/// <summary>
+/// Builds parameterized UPDATE statements.
+/// </summary>
+public sealed class UpdateBuilder
+{
+    /// <summary>
+    /// Builds an UPDATE statement using the supplied master metadata.
+    /// </summary>
+    public SqlStatement Build(
+        MasterDefinition definition,
+        object values)
+    {
+        var key = definition.Columns
+            .First(column => column.IsPrimaryKey);
+
+        var columns = definition.Columns
+            .Where(column => !column.IsPrimaryKey)
+            .ToArray();
+
+        var assignments = string.Join(
+            ", ",
+            columns.Select(column =>
+                $"{SqlName.Identifier(column.ColumnName)} = @{column.PropertyName}"));
+
+        var tenantPredicate = definition.Tenant.TenantId is null
+            ? string.Empty
+            : $" AND {SqlName.Identifier(definition.Tenant.TenantId.ColumnName)} " +
+              $"= @{definition.Tenant.TenantId.PropertyName}";
+
+        var sql =
+            $"UPDATE {SqlName.Identifier(definition.TableName)} " +
+            $"SET {assignments} " +
+            $"WHERE {SqlName.Identifier(key.ColumnName)} = @{key.PropertyName}" +
+            tenantPredicate;
+
+        return new SqlStatement(sql, values);
+    }
+}
+
+/// <summary>
+/// Builds parameterized DELETE statements.
+/// </summary>
+public sealed class DeleteBuilder
+{
+    /// <summary>
+    /// Builds a DELETE statement using the supplied master metadata.
+    /// </summary>
+    public SqlStatement Build(
+        MasterDefinition definition,
+        object parameters)
+    {
+        var key = definition.Columns
+            .First(column => column.IsPrimaryKey);
+
+        var tenantPredicate = definition.Tenant.TenantId is null
+            ? string.Empty
+            : $" AND {SqlName.Identifier(definition.Tenant.TenantId.ColumnName)} = @TenantId";
+
+        var sql =
+            $"DELETE FROM {SqlName.Identifier(definition.TableName)} " +
+            $"WHERE {SqlName.Identifier(key.ColumnName)} = @{key.PropertyName}" +
+            tenantPredicate;
+
+        return new SqlStatement(sql, parameters);
+    }
+}
+
+/// <summary>
+/// Builds parameterized SELECT statements.
+/// </summary>
 public sealed class SelectBuilder
 {
-    public SqlStatement Build(MasterDefinition d, object? parameters = null)
+    /// <summary>
+    /// Builds a SELECT statement using the supplied master metadata.
+    /// </summary>
+    public SqlStatement Build(
+        MasterDefinition definition,
+        object? parameters = null)
     {
-        var columns = string.Join(", ",
-            d.Columns.Select(c =>
-                $"{SqlName.Identifier(c.ColumnName)} AS \"{c.PropertyName}\""));
+        var columns = string.Join(
+            ", ",
+            definition.Columns.Select(column =>
+                $"{SqlName.Identifier(column.ColumnName)} AS \"{column.PropertyName}\""));
 
-        return new SqlStatement(
-            $"SELECT {columns} FROM {SqlName.Identifier(d.TableName)}",
-            parameters);
+        var tableName = SqlName.Identifier(definition.TableName);
+
+        var sql = $"SELECT {columns} FROM {tableName}";
+
+        return new SqlStatement(sql, parameters);
     }
-}/// <summary>Builds parameterized existence statements.</summary>
-public sealed class ExistsBuilder { public SqlStatement Build(MasterDefinition d) { var key=d.Columns.First(c=>c.IsPrimaryKey); return new SqlStatement($"SELECT EXISTS (SELECT 1 FROM {SqlName.Identifier(d.TableName)} WHERE {SqlName.Identifier(key.ColumnName)} = @{key.PropertyName})", null); } }
-/// <summary>Builds parameterized count statements.</summary>
-public sealed class CountBuilder { public SqlStatement Build(MasterDefinition d) => new($"SELECT COUNT(1) FROM {SqlName.Identifier(d.TableName)}", null); }
-/// <summary>Builds duplicate check statements.</summary>
-public sealed class DuplicateBuilder { public SqlStatement Build(MasterDefinition d, object values) { var cols=d.Duplicate.Columns; if (cols.Count==0) throw new InvalidOperationException("Duplicate check requires duplicate columns."); return new SqlStatement($"SELECT EXISTS (SELECT 1 FROM {SqlName.Identifier(d.TableName)} WHERE {string.Join(" AND ", cols.Select(c=>$"{SqlName.Identifier(c.ColumnName)} = @{c.PropertyName}"))})", values); } }
-/// <summary>Builds pagination clauses.</summary>
-public sealed class PaginationBuilder { public string Build(PagedRequest request) => $"LIMIT @PageSize OFFSET @Offset"; }
-/// <summary>Builds parameterized search predicates.</summary>
+}
+
+/// <summary>
+/// Builds parameterized EXISTS statements.
+/// </summary>
+public sealed class ExistsBuilder
+{
+    /// <summary>
+    /// Builds an EXISTS statement using the supplied master metadata.
+    /// </summary>
+    public SqlStatement Build(MasterDefinition definition)
+    {
+        var key = definition.Columns
+            .First(column => column.IsPrimaryKey);
+
+        var sql =
+            $"SELECT EXISTS (" +
+            $"SELECT 1 FROM {SqlName.Identifier(definition.TableName)} " +
+            $"WHERE {SqlName.Identifier(key.ColumnName)} = @{key.PropertyName})";
+
+        return new SqlStatement(sql, null);
+    }
+}
+
+/// <summary>
+/// Builds parameterized COUNT statements.
+/// </summary>
+public sealed class CountBuilder
+{
+    /// <summary>
+    /// Builds a COUNT statement using the supplied master metadata.
+    /// </summary>
+    public SqlStatement Build(MasterDefinition definition)
+    {
+        var sql =
+            $"SELECT COUNT(1) " +
+            $"FROM {SqlName.Identifier(definition.TableName)}";
+
+        return new SqlStatement(sql, null);
+    }
+}
+
+/// <summary>
+/// Builds duplicate-check statements.
+/// </summary>
+public sealed class DuplicateBuilder
+{
+    /// <summary>
+    /// Builds a duplicate-check statement using the supplied master metadata.
+    /// </summary>
+    public SqlStatement Build(
+        MasterDefinition definition,
+        object values)
+    {
+        var columns = definition.Duplicate.Columns;
+
+        if (columns.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "Duplicate check requires duplicate columns.");
+        }
+
+        var predicates = string.Join(
+            " AND ",
+            columns.Select(column =>
+                $"{SqlName.Identifier(column.ColumnName)} = @{column.PropertyName}"));
+
+        var sql =
+            $"SELECT EXISTS (" +
+            $"SELECT 1 FROM {SqlName.Identifier(definition.TableName)} " +
+            $"WHERE {predicates})";
+
+        return new SqlStatement(sql, values);
+    }
+}
+
+/// <summary>
+/// Builds pagination clauses.
+/// </summary>
+public sealed class PaginationBuilder
+{
+    /// <summary>
+    /// Builds LIMIT and OFFSET clauses.
+    /// </summary>
+    public string Build(PagedRequest request)
+    {
+        return "LIMIT @PageSize OFFSET @Offset";
+    }
+}
+
+/// <summary>
+/// Builds parameterized search predicates.
+/// </summary>
 public sealed class SearchBuilder
 {
-    /// <summary>Builds a WHERE clause from filters.</summary>
-    public SqlStatement Build(MasterDefinition d, IReadOnlyList<FilterDefinition> filters)
+    /// <summary>
+    /// Builds a WHERE clause from filters.
+    /// </summary>
+    public SqlStatement Build(
+        MasterDefinition definition,
+        IReadOnlyList<FilterDefinition> filters)
     {
-        var p = new DynamicParameters(); var parts = new List<string>(); var i=0;
-        foreach (var f in filters) { var c=d.Columns.First(x=>x.PropertyName==f.Field || x.ColumnName==f.Field); var name="p"+i++; parts.Add(ToSql(c, f, name, p)); }
-        return new SqlStatement(parts.Count==0 ? string.Empty : "WHERE "+string.Join(" AND ", parts), p);
+        var parameters = new DynamicParameters();
+        var parts = new List<string>();
+
+        var parameterIndex = 0;
+
+        foreach (var filter in filters)
+        {
+            var column = definition.Columns.First(
+                candidate =>
+                    string.Equals(
+                        candidate.PropertyName,
+                        filter.Field,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(
+                        candidate.ColumnName,
+                        filter.Field,
+                        StringComparison.OrdinalIgnoreCase));
+
+            var parameterName = $"p{parameterIndex++}";
+
+            var sql = ToSql(
+                column,
+                filter,
+                parameterName,
+                parameters);
+
+            parts.Add(sql);
+        }
+
+        var whereClause = parts.Count == 0
+            ? string.Empty
+            : $"WHERE {string.Join(" AND ", parts)}";
+
+        return new SqlStatement(
+            whereClause,
+            parameters);
     }
-    private static string ToSql(ColumnDefinition c, FilterDefinition f, string p, DynamicParameters ps) { var col=SqlName.Identifier(c.ColumnName); switch(f.Operator) { case SearchOperator.Contains: ps.Add(p,$"%{f.Value}%"); return $"{col} LIKE @{p}"; case SearchOperator.StartsWith: ps.Add(p,$"{f.Value}%"); return $"{col} LIKE @{p}"; case SearchOperator.EndsWith: ps.Add(p,$"%{f.Value}"); return $"{col} LIKE @{p}"; case SearchOperator.Equals: ps.Add(p,f.Value); return $"{col} = @{p}"; case SearchOperator.NotEquals: ps.Add(p,f.Value); return $"{col} <> @{p}"; case SearchOperator.In: ps.Add(p,f.Values); return $"{col} IN @{p}"; case SearchOperator.NotIn: ps.Add(p,f.Values); return $"{col} NOT IN @{p}"; case SearchOperator.Between: ps.Add(p+"a",f.Value); ps.Add(p+"b",f.SecondValue); return $"{col} BETWEEN @{p}a AND @{p}b"; case SearchOperator.GreaterThan: ps.Add(p,f.Value); return $"{col} > @{p}"; case SearchOperator.GreaterOrEqual: ps.Add(p,f.Value); return $"{col} >= @{p}"; case SearchOperator.LessThan: ps.Add(p,f.Value); return $"{col} < @{p}"; case SearchOperator.LessOrEqual: ps.Add(p,f.Value); return $"{col} <= @{p}"; case SearchOperator.IsNull: return $"{col} IS NULL"; case SearchOperator.IsNotNull: return $"{col} IS NOT NULL"; default: throw new ArgumentOutOfRangeException(nameof(f)); } }
+
+    private static string ToSql(
+        ColumnDefinition column,
+        FilterDefinition filter,
+        string parameterName,
+        DynamicParameters parameters)
+    {
+        var columnName = SqlName.Identifier(column.ColumnName);
+
+        switch (filter.Operator)
+        {
+            case SearchOperator.Contains:
+                parameters.Add(
+                    parameterName,
+                    $"%{filter.Value}%");
+
+                return $"{columnName} LIKE @{parameterName}";
+
+            case SearchOperator.StartsWith:
+                parameters.Add(
+                    parameterName,
+                    $"{filter.Value}%");
+
+                return $"{columnName} LIKE @{parameterName}";
+
+            case SearchOperator.EndsWith:
+                parameters.Add(
+                    parameterName,
+                    $"%{filter.Value}");
+
+                return $"{columnName} LIKE @{parameterName}";
+
+            case SearchOperator.Equals:
+                parameters.Add(
+                    parameterName,
+                    filter.Value);
+
+                return $"{columnName} = @{parameterName}";
+
+            case SearchOperator.NotEquals:
+                parameters.Add(
+                    parameterName,
+                    filter.Value);
+
+                return $"{columnName} <> @{parameterName}";
+
+            case SearchOperator.In:
+                parameters.Add(
+                    parameterName,
+                    filter.Values);
+
+                return $"{columnName} IN @{parameterName}";
+
+            case SearchOperator.NotIn:
+                parameters.Add(
+                    parameterName,
+                    filter.Values);
+
+                return $"{columnName} NOT IN @{parameterName}";
+
+            case SearchOperator.Between:
+                parameters.Add(
+                    $"{parameterName}a",
+                    filter.Value);
+
+                parameters.Add(
+                    $"{parameterName}b",
+                    filter.SecondValue);
+
+                return
+                    $"{columnName} BETWEEN " +
+                    $"@{parameterName}a AND @{parameterName}b";
+
+            case SearchOperator.GreaterThan:
+                parameters.Add(
+                    parameterName,
+                    filter.Value);
+
+                return $"{columnName} > @{parameterName}";
+
+            case SearchOperator.GreaterOrEqual:
+                parameters.Add(
+                    parameterName,
+                    filter.Value);
+
+                return $"{columnName} >= @{parameterName}";
+
+            case SearchOperator.LessThan:
+                parameters.Add(
+                    parameterName,
+                    filter.Value);
+
+                return $"{columnName} < @{parameterName}";
+
+            case SearchOperator.LessOrEqual:
+                parameters.Add(
+                    parameterName,
+                    filter.Value);
+
+                return $"{columnName} <= @{parameterName}";
+
+            case SearchOperator.IsNull:
+                return $"{columnName} IS NULL";
+
+            case SearchOperator.IsNotNull:
+                return $"{columnName} IS NOT NULL";
+
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(filter),
+                    filter.Operator,
+                    "Unsupported search operator.");
+        }
+    }
 }
