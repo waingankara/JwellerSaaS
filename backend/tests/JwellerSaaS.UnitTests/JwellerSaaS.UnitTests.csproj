@@ -6,5 +6,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orion.Framework\Orion.Framework.csproj" />
+    <ProjectReference Include="..\..\src\JwellerSaaS.Domain\JwellerSaaS.Domain.csproj" />
   </ItemGroup>
 </Project>

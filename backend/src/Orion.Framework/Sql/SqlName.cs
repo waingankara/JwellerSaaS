@@ -9,7 +9,7 @@ public static partial class SqlName
     public static string Identifier(string value)
     {
         if (!IdentifierRegex().IsMatch(value)) throw new ArgumentException("Invalid SQL identifier.", nameof(value));
-        return value;
+        return $"\"{value}\"";
     }
 
     [GeneratedRegex("^[A-Za-z_][A-Za-z0-9_]*$")]

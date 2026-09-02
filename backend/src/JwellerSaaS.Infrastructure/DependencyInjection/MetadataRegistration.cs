@@ -20,11 +20,7 @@ public static class MetadataRegistration
 
         foreach (var type in masterTypes)
         {
-            var method = typeof(IMasterRegistry)
-                .GetMethod(nameof(IMasterRegistry.Register))!
-                .MakeGenericMethod(type);
-
-            method.Invoke(registry, null);
+            registry.Register(type);
         }
 
         return services;
