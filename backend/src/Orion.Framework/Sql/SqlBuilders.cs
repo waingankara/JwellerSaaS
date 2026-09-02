@@ -14,8 +14,19 @@ public sealed class UpdateBuilder { public SqlStatement Build(MasterDefinition d
 /// <summary>Builds parameterized delete statements.</summary>
 public sealed class DeleteBuilder { public SqlStatement Build(MasterDefinition d, object parameters) { var key=d.Columns.First(c=>c.IsPrimaryKey); var tenant=d.Tenant.TenantId is null ? string.Empty : $" AND {SqlName.Identifier(d.Tenant.TenantId.ColumnName)} = @TenantId"; return new SqlStatement($"DELETE FROM {SqlName.Identifier(d.TableName)} WHERE {SqlName.Identifier(key.ColumnName)} = @{key.PropertyName}{tenant}", parameters); } }
 /// <summary>Builds parameterized select statements.</summary>
-public sealed class SelectBuilder { public SqlStatement Build(MasterDefinition d, object? parameters=null) => new($"SELECT {string.Join(", ", d.Columns.Select(c=>SqlName.Identifier(c.ColumnName)))} FROM {SqlName.Identifier(d.TableName)}", parameters); }
-/// <summary>Builds parameterized existence statements.</summary>
+public sealed class SelectBuilder
+{
+    public SqlStatement Build(MasterDefinition d, object? parameters = null)
+    {
+        var columns = string.Join(", ",
+            d.Columns.Select(c =>
+                $"{SqlName.Identifier(c.ColumnName)} AS \"{c.PropertyName}\""));
+
+        return new SqlStatement(
+            $"SELECT {columns} FROM {SqlName.Identifier(d.TableName)}",
+            parameters);
+    }
+}/// <summary>Builds parameterized existence statements.</summary>
 public sealed class ExistsBuilder { public SqlStatement Build(MasterDefinition d) { var key=d.Columns.First(c=>c.IsPrimaryKey); return new SqlStatement($"SELECT EXISTS (SELECT 1 FROM {SqlName.Identifier(d.TableName)} WHERE {SqlName.Identifier(key.ColumnName)} = @{key.PropertyName})", null); } }
 /// <summary>Builds parameterized count statements.</summary>
 public sealed class CountBuilder { public SqlStatement Build(MasterDefinition d) => new($"SELECT COUNT(1) FROM {SqlName.Identifier(d.TableName)}", null); }

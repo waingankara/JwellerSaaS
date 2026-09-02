@@ -57,7 +57,10 @@ public sealed class CrudSqlBuilder
     }
 
     private static IEnumerable<string> Columns(MasterDefinition m, IReadOnlyList<string>? selected) => (selected is { Count: > 0 } ? selected.Select(s => Find(m, s)) : m.Columns).Select(c => SqlName.Identifier(c.ColumnName));
-    private static ColumnDefinition Find(MasterDefinition m, string field) => m.Columns.First(c => c.PropertyName == field || c.ColumnName == field);
+    private static ColumnDefinition Find(MasterDefinition m, string field) =>
+        m.Columns.First(c =>
+            string.Equals(c.PropertyName, field, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(c.ColumnName, field, StringComparison.OrdinalIgnoreCase));
     private static void AppendWhere(StringBuilder sql, MasterDefinition m, QueryDefinition q, DynamicParameters p)
     {
         var parts = new List<string>(); var i = 0;
