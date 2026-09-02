@@ -12,6 +12,7 @@ using Orion.Framework.Crud;
 using Orion.Framework.DomainEvents;
 using Orion.Framework.Validation;
 using Orion.Framework.Diagnostics;
+using Orion.Framework.Transactions;
 
 namespace Orion.Framework.DependencyInjection;
 
@@ -55,6 +56,11 @@ public static class OrionFrameworkServiceCollectionExtensions
         services.AddHostedService<OrionMetadataDiscoveryHostedService>();
         services.AddScoped<HeaderTenantResolver>();
         services.AddScoped<ITenantResolver>(provider => new CompositeTenantResolver(new ITenantResolver[] { provider.GetRequiredService<HeaderTenantResolver>() }));
+        services.AddScoped<TransactionContext>();
+        services.AddScoped<ITransactionContext>(
+            provider => provider.GetRequiredService<TransactionContext>());
+        services.AddScoped<ITransactionScopeFactory, NpgsqlTransactionScopeFactory>();
+        services.AddScoped<ITransactionManager, TransactionManager>();
         return services;
     }
 }
