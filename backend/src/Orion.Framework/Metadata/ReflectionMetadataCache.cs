@@ -19,6 +19,8 @@ public sealed class ReflectionMetadataCache : IReflectionMetadataCache
     private static MasterDefinition Build(Type entityType)
     {
         var master = entityType.GetCustomAttribute<MasterAttribute>();
+        var transactional = entityType.GetCustomAttribute<TransactionalAttribute>();
+
         var columns = entityType.GetProperties(BindingFlags.Instance | BindingFlags.Public)
             .Select(property => CreateColumn(property))
             .Where(column => !column.IsIgnored)
@@ -27,7 +29,9 @@ public sealed class ReflectionMetadataCache : IReflectionMetadataCache
         return new MasterDefinition(
             entityType,
             entityType.Name,
-            master?.TableName ?? entityType.Name,
+            master?.TableName
+            ?? transactional?.TableName
+            ?? entityType.Name,
             key?.PropertyType,
             columns,
             new SearchDefinition(columns.Where(c => c.IsSearchable).ToArray()),
