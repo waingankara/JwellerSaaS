@@ -30,24 +30,45 @@ public sealed class TransactionIntegrationTests
         var transactionManager =
             new TransactionManager(scopeFactory);
 
+        var sqlExecutor =
+            new SqlExecutor(
+                connectionFactory,
+                transactionContext);
+
         await transactionManager.ExecuteAsync(
-                 cancellationToken =>
-                 {
-                     using var command =
-                         transactionContext.Connection!.CreateCommand();
+            async cancellationToken =>
+            {
+                await sqlExecutor.ExecuteAsync(
+                    """
+                    INSERT INTO transaction_test (value)
+                    VALUES ('commit-test');
+                    """,
+                    null,
+                    cancellationToken);
 
-                     command.Transaction =
-                         transactionContext.Transaction;
-
-                     command.CommandText =
-                         "INSERT INTO transaction_test (value) VALUES ('commit-test');";
-
-                     command.ExecuteNonQuery();
-
-                     return Task.FromResult(true);
-                 });
+                return true;
+            });
 
         Assert.False(transactionContext.IsActive);
+
+        var verificationContext =
+            new TransactionContext();
+
+        var verificationExecutor =
+            new SqlExecutor(
+                connectionFactory,
+                verificationContext);
+
+        var count = await verificationExecutor.ScalarAsync<int>(
+            """
+            SELECT COUNT(*)
+            FROM transaction_test
+            WHERE value = 'commit-test';
+            """,
+            null,
+            CancellationToken.None);
+
+        Assert.True(count >= 1);
     }
 
     [Fact]
@@ -73,28 +94,45 @@ public sealed class TransactionIntegrationTests
         var transactionManager =
             new TransactionManager(scopeFactory);
 
+        var sqlExecutor =
+            new SqlExecutor(
+                connectionFactory,
+                transactionContext);
+
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => transactionManager.ExecuteAsync(
-                cancellationToken =>
+            () => transactionManager.ExecuteAsync<bool>(
+                async cancellationToken =>
                 {
-                    using var command =
-                        transactionContext.Connection!.CreateCommand();
-
-                    command.Transaction =
-                        transactionContext.Transaction;
-
-                    command.CommandText =
-                        "INSERT INTO transaction_test (value) VALUES ('rollback-test');";
-
-                    command.ExecuteNonQuery();
+                    await sqlExecutor.ExecuteAsync(
+                        """
+                        INSERT INTO transaction_test (value)
+                        VALUES ('rollback-test');
+                        """,
+                        null,
+                        cancellationToken);
 
                     throw new InvalidOperationException("Rollback test");
-
-#pragma warning disable CS0162
-                    return Task.FromResult(true);
-#pragma warning restore CS0162
                 }));
 
         Assert.False(transactionContext.IsActive);
+
+        var verificationContext =
+            new TransactionContext();
+
+        var verificationExecutor =
+            new SqlExecutor(
+                connectionFactory,
+                verificationContext);
+
+        var count = await verificationExecutor.ScalarAsync<int>(
+            """
+            SELECT COUNT(*)
+            FROM transaction_test
+            WHERE value = 'rollback-test';
+            """,
+            null,
+            CancellationToken.None);
+
+        Assert.Equal(0, count);
     }
 }

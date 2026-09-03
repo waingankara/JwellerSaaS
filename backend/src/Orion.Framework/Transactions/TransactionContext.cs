@@ -7,9 +7,11 @@ namespace Orion.Framework.Transactions;
 /// </summary>
 public sealed class TransactionContext : ITransactionContext, ITransactionContextAccessor
 {
+
     /// <inheritdoc />
-    ///
     public System.Data.IDbConnection? Connection { get; private set; }
+
+    /// <inheritdoc />
     public System.Data.IDbTransaction? Transaction { get; private set; }
 
     /// <inheritdoc />
@@ -18,7 +20,7 @@ public sealed class TransactionContext : ITransactionContext, ITransactionContex
     /// <summary>
     /// Sets the current database transaction.
     /// </summary>
-    /// /// <param name="connection">
+    /// <param name="connection">
     /// The database connection associated with the transaction.
     /// </param>
     /// <param name="transaction">

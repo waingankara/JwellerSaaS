@@ -35,8 +35,8 @@ public sealed class NpgsqlTransactionScopeFactory : ITransactionScopeFactory
         var transaction = connection.BeginTransaction();
 
         _transactionContext.SetTransaction(
-         connection,
-         transaction);
+             connection,
+             transaction);
 
         return new NpgsqlTransactionScope(
             connection,
