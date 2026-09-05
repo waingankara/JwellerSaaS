@@ -57,10 +57,10 @@ public static class OrionFrameworkServiceCollectionExtensions
         services.AddScoped<HeaderTenantResolver>();
         services.AddScoped<ITenantResolver>(provider => new CompositeTenantResolver(new ITenantResolver[] { provider.GetRequiredService<HeaderTenantResolver>() }));
         services.AddScoped<TransactionContext>();
-        services.AddScoped<ITransactionContext>(
-            provider => provider.GetRequiredService<TransactionContext>());
+        services.AddScoped<ITransactionContext>(provider => provider.GetRequiredService<TransactionContext>());
         services.AddScoped<ITransactionScopeFactory, NpgsqlTransactionScopeFactory>();
         services.AddScoped<ITransactionManager, TransactionManager>();
+        services.AddScoped<ITransactionalOperationExecutor, TransactionalOperationExecutor>();
         return services;
     }
 }

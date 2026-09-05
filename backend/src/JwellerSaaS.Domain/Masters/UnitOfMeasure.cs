@@ -1,35 +1,40 @@
 using Orion.Framework.Metadata.Attributes;
 
-namespace JwellerSaaS.Domain.Transactions;
+namespace JwellerSaaS.Domain.Masters;
 
-[Transactional("product_variant")]
-public sealed class ProductVariant
+[Master("unit_of_measure")]
+public sealed class UnitOfMeasure
 {
     [PrimaryKey]
-    [DbColumn("product_variant_id")]
-    public long ProductVariantId { get; set; }
+    [DbColumn("unit_id")]
+    public long UnitId { get; set; }
 
     [DbColumn("tenant_id")]
     public long TenantId { get; set; }
-
-    [RequiredForInsert]
-    [RequiredForUpdate]
-    [DbColumn("product_id")]
-    public long ProductId { get; set; }
 
     [Searchable]
     [DuplicateCheck]
     [RequiredForInsert]
     [RequiredForUpdate]
-    [DbColumn("sku")]
-    public string Sku { get; set; } = string.Empty;
+    [DbColumn("unit_code")]
+    public string UnitCode { get; set; } = string.Empty;
 
     [Searchable]
-    [DbColumn("variant_name")]
-    public string? VariantName { get; set; }
+    [DuplicateCheck]
+    [DropdownColumn]
+    [RequiredForInsert]
+    [RequiredForUpdate]
+    [DbColumn("unit_name")]
+    public string UnitName { get; set; } = string.Empty;
 
-    [DbColumn("unit_id")]
-    public long? UnitId { get; set; }
+    [DbColumn("decimal_places")]
+    public int DecimalPlaces { get; set; } = 3;
+
+    [DbColumn("display_order")]
+    public int DisplayOrder { get; set; }
+
+    [DbColumn("remarks")]
+    public string? Remarks { get; set; }
 
     [DbColumn("is_active")]
     public bool IsActive { get; set; } = true;
@@ -37,6 +42,7 @@ public sealed class ProductVariant
     [DbColumn("created_by")]
     public long? CreatedBy { get; set; }
 
+    [Searchable]
     [DbColumn("created_date")]
     public DateTimeOffset? CreatedDate { get; set; }
 
@@ -52,6 +58,7 @@ public sealed class ProductVariant
     [DbColumn("deleted_date")]
     public DateTimeOffset? DeletedDate { get; set; }
 
+    [Searchable]
     [DbColumn("is_deleted")]
     public bool IsDeleted { get; set; }
 

@@ -45,6 +45,57 @@ public sealed class FrameworkCoreTests
         Assert.Contains(
             registry.All,
             definition => definition.EntityName == "Category");
+
+        Assert.Contains(
+            definitions,
+            definition => definition.EntityName == "Product");
+
+	    Assert.Contains(
+            definitions,
+            definition => definition.EntityName == "ProductType");
+
+        Assert.Contains(
+            definitions,
+            definition => definition.EntityName == "Brand");
+
+        Assert.Contains(
+            definitions,
+            definition => definition.EntityName == "Collection");
+
+        Assert.Contains(
+            definitions,
+            definition => definition.EntityName == "UnitOfMeasure");
+
+	    Assert.Contains(
+    		definitions,
+            	definition => definition.EntityName == "Metal");
+
+	    Assert.Contains(
+    		definitions,
+    		definition => definition.EntityName == "MetalPurity");
+
+        Assert.Contains(
+            definitions,
+            definition => definition.EntityName == "StoneType");
+
+        Assert.Contains(
+            definitions,
+            definition => definition.EntityName == "StoneShape");
+
+        Assert.Contains(
+            definitions,
+            definition => definition.EntityName == "StoneColor");
+
+        Assert.Contains(
+            definitions,
+            definition => definition.EntityName == "StoneClarity");
+        Assert.Contains(
+            definitions,
+            definition => definition.EntityName == "MakingChargeType");
+        Assert.Contains(
+            definitions,
+            definition => definition.EntityName == "PriceComponent");
+
     }
 
     [Fact]

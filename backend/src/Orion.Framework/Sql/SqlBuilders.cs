@@ -34,10 +34,18 @@ public sealed class InsertBuilder
             columns.Select(column =>
                 $"@{column.PropertyName}"));
 
+        var primaryKey =definition.Columns.FirstOrDefault(column => column.IsPrimaryKey);
+
         var sql =
             $"INSERT INTO {SqlName.Identifier(definition.TableName)} " +
             $"({columnNames}) " +
             $"VALUES ({parameterNames})";
+
+        if (primaryKey is not null)
+        {
+            sql +=
+                $" RETURNING {SqlName.Identifier(primaryKey.ColumnName)}";
+        }
 
         return new SqlStatement(sql, values);
     }

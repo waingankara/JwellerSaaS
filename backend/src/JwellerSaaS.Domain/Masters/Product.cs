@@ -1,35 +1,54 @@
 using Orion.Framework.Metadata.Attributes;
 
-namespace JwellerSaaS.Domain.Transactions;
+namespace JwellerSaaS.Domain.Masters;
 
-[Transactional("product_variant")]
-public sealed class ProductVariant
+/// <summary>
+/// Represents a jewellery product/design within a tenant catalogue.
+/// </summary>
+[Master("product")]
+public sealed class Product
 {
     [PrimaryKey]
-    [DbColumn("product_variant_id")]
-    public long ProductVariantId { get; set; }
+    [DbColumn("product_id")]
+    public long ProductId { get; set; }
 
     [DbColumn("tenant_id")]
     public long TenantId { get; set; }
-
-    [RequiredForInsert]
-    [RequiredForUpdate]
-    [DbColumn("product_id")]
-    public long ProductId { get; set; }
 
     [Searchable]
     [DuplicateCheck]
     [RequiredForInsert]
     [RequiredForUpdate]
-    [DbColumn("sku")]
-    public string Sku { get; set; } = string.Empty;
+    [DbColumn("subcategory_id")]
+    public long SubCategoryId { get; set; }
 
     [Searchable]
-    [DbColumn("variant_name")]
-    public string? VariantName { get; set; }
+    [DuplicateCheck]
+    [RequiredForInsert]
+    [RequiredForUpdate]
+    [DbColumn("product_code")]
+    public string ProductCode { get; set; } = string.Empty;
 
-    [DbColumn("unit_id")]
-    public long? UnitId { get; set; }
+    [Searchable]
+    [DuplicateCheck]
+    [DropdownColumn]
+    [RequiredForInsert]
+    [RequiredForUpdate]
+    [DbColumn("product_name")]
+    public string ProductName { get; set; } = string.Empty;
+
+    [Searchable]
+    [DbColumn("description")]
+    public string? Description { get; set; }
+
+    [DbColumn("product_type_id")]
+    public long? ProductTypeId { get; set; }
+
+    [DbColumn("brand_id")]
+    public long? BrandId { get; set; }
+
+    [DbColumn("collection_id")]
+    public long? CollectionId { get; set; }
 
     [DbColumn("is_active")]
     public bool IsActive { get; set; } = true;
@@ -37,6 +56,7 @@ public sealed class ProductVariant
     [DbColumn("created_by")]
     public long? CreatedBy { get; set; }
 
+    [Searchable]
     [DbColumn("created_date")]
     public DateTimeOffset? CreatedDate { get; set; }
 
@@ -52,6 +72,7 @@ public sealed class ProductVariant
     [DbColumn("deleted_date")]
     public DateTimeOffset? DeletedDate { get; set; }
 
+    [Searchable]
     [DbColumn("is_deleted")]
     public bool IsDeleted { get; set; }
 

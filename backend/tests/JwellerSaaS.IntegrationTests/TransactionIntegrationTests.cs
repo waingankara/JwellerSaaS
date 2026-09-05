@@ -1,5 +1,10 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Orion.Framework.Crud;
 using Orion.Framework.Data;
+using Orion.Framework.DependencyInjection;
+using Orion.Framework.Security;
+using Orion.Framework.Tenancy;
 using Orion.Framework.Transactions;
 using Xunit;
 
@@ -8,7 +13,7 @@ namespace JwellerSaaS.IntegrationTests;
 public sealed class TransactionIntegrationTests
 {
     [Fact]
-    public async Task TransactionManager_CommitsDatabaseChanges()
+    public async Task TransactionalOperationExecutor_CommitsDatabaseChanges()
     {
         var configuration = new ConfigurationBuilder()
             .AddJsonFile(
@@ -30,25 +35,22 @@ public sealed class TransactionIntegrationTests
         var transactionManager =
             new TransactionManager(scopeFactory);
 
+        var transactionalExecutor =
+            new TransactionalOperationExecutor(
+                transactionManager);
+
         var sqlExecutor =
             new SqlExecutor(
                 connectionFactory,
                 transactionContext);
 
-        await transactionManager.ExecuteAsync(
-            async cancellationToken =>
-            {
-                await sqlExecutor.ExecuteAsync(
-                    """
-                    INSERT INTO transaction_test (value)
-                    VALUES ('commit-test');
-                    """,
-                    null,
-                    cancellationToken);
+        var operation =
+            new CommitTestOperation(sqlExecutor);
 
-                return true;
-            });
+        var result =
+            await transactionalExecutor.ExecuteAsync(operation);
 
+        Assert.True(result);
         Assert.False(transactionContext.IsActive);
 
         var verificationContext =
@@ -72,7 +74,7 @@ public sealed class TransactionIntegrationTests
     }
 
     [Fact]
-    public async Task TransactionManager_RollsBackDatabaseChanges()
+    public async Task TransactionalOperationExecutor_RollsBackDatabaseChanges()
     {
         var configuration = new ConfigurationBuilder()
             .AddJsonFile(
@@ -94,25 +96,20 @@ public sealed class TransactionIntegrationTests
         var transactionManager =
             new TransactionManager(scopeFactory);
 
+        var transactionalExecutor =
+            new TransactionalOperationExecutor(
+                transactionManager);
+
         var sqlExecutor =
             new SqlExecutor(
                 connectionFactory,
                 transactionContext);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => transactionManager.ExecuteAsync<bool>(
-                async cancellationToken =>
-                {
-                    await sqlExecutor.ExecuteAsync(
-                        """
-                        INSERT INTO transaction_test (value)
-                        VALUES ('rollback-test');
-                        """,
-                        null,
-                        cancellationToken);
+        var operation =
+            new RollbackTestOperation(sqlExecutor);
 
-                    throw new InvalidOperationException("Rollback test");
-                }));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => transactionalExecutor.ExecuteAsync(operation));
 
         Assert.False(transactionContext.IsActive);
 
@@ -134,5 +131,143 @@ public sealed class TransactionIntegrationTests
             CancellationToken.None);
 
         Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public async Task GenericCrud_CreateAsync_PopulatesGeneratedId()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile(
+                "appsettings.json",
+                optional: false)
+            .Build();
+
+        var services = new ServiceCollection();
+
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddLogging();
+        services.AddOrionFramework();
+
+        services.AddScoped<
+            ITenantContextAccessor,
+            TestTenantContextAccessor>();
+
+        services.AddScoped<
+            ICurrentUserAccessor,
+            TestCurrentUserAccessor>();
+
+        await using var provider =
+            services.BuildServiceProvider();
+
+        using var scope =
+            provider.CreateScope();
+
+        var crudService =
+            scope.ServiceProvider
+                .GetRequiredService<
+                    ICrudService<FrameworkIntegrationTest>>();
+
+        var transactionExecutor =
+            scope.ServiceProvider
+                .GetRequiredService<
+                    ITransactionalOperationExecutor>();
+
+        var entity =
+            new FrameworkIntegrationTest
+            {
+                Value =
+                    $"generated-key-{Guid.NewGuid():N}"
+            };
+
+        var operation =
+            new CreateFrameworkIntegrationTestOperation(
+                crudService,
+                entity);
+
+        var result =
+            await transactionExecutor.ExecuteAsync(
+                operation);
+
+        Assert.True(result);
+        Assert.True(
+            entity.FrameworkIntegrationTestId > 0);
+    }
+
+    private sealed class CommitTestOperation(
+        ISqlExecutor sqlExecutor)
+        : ITransactionalOperation<bool>
+    {
+        public async Task<bool> ExecuteAsync(
+            CancellationToken cancellationToken = default)
+        {
+            await sqlExecutor.ExecuteAsync(
+                """
+                INSERT INTO transaction_test (value)
+                VALUES ('commit-test');
+                """,
+                null,
+                cancellationToken);
+
+            return true;
+        }
+    }
+
+    private sealed class RollbackTestOperation(
+        ISqlExecutor sqlExecutor)
+        : ITransactionalOperation<bool>
+    {
+        public async Task<bool> ExecuteAsync(
+            CancellationToken cancellationToken = default)
+        {
+            await sqlExecutor.ExecuteAsync(
+                """
+                INSERT INTO transaction_test (value)
+                VALUES ('rollback-test');
+                """,
+                null,
+                cancellationToken);
+
+            throw new InvalidOperationException(
+                "Rollback test");
+        }
+    }
+
+    private sealed class CreateFrameworkIntegrationTestOperation(
+        ICrudService<FrameworkIntegrationTest> crudService,
+        FrameworkIntegrationTest entity)
+        : ITransactionalOperation<bool>
+    {
+        public async Task<bool> ExecuteAsync(
+            CancellationToken cancellationToken = default)
+        {
+            await crudService.CreateAsync(
+                entity,
+                cancellationToken);
+
+            return true;
+        }
+    }
+
+    private sealed class TestTenantContextAccessor
+        : ITenantContextAccessor
+    {
+        public TenantContext TenantContext { get; } =
+            new(1, false);
+    }
+
+    private sealed class TestCurrentUserAccessor
+        : ICurrentUserAccessor
+    {
+        public CurrentUser CurrentUser { get; } =
+            new(
+                1,
+                "integration-test",
+                "integration@test.local",
+                1,
+                null,
+                new HashSet<string>(),
+                new HashSet<string>(),
+                null,
+                null);
     }
 }

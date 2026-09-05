@@ -516,8 +516,8 @@ public sealed class CrudPipeline(
     }
 
     private async Task ExecuteSqlAsync(
-        CrudContext context,
-        CancellationToken cancellationToken)
+    CrudContext context,
+    CancellationToken cancellationToken)
     {
         if (context.Sql is null ||
             context.Operation is
@@ -527,6 +527,51 @@ public sealed class CrudPipeline(
                 CrudOperation.Count)
         {
             return;
+        }
+
+        if (context.Operation == CrudOperation.Create)
+        {
+            var primaryKey =
+                context.Metadata?.Columns
+                    .FirstOrDefault(column => column.IsPrimaryKey);
+
+            if (primaryKey is not null && context.Entity is not null)
+            {
+                var generatedKey =
+                    await executor.ScalarAsync<object>(
+                        context.Sql,
+                        context.Parameters,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (generatedKey is not null)
+                {
+                    var property =
+                        context.Entity.GetType()
+                            .GetProperty(primaryKey.PropertyName);
+
+                    if (property is not null)
+                    {
+                        var targetType =
+                            Nullable.GetUnderlyingType(
+                                primaryKey.PropertyType)
+                            ?? primaryKey.PropertyType;
+
+                        var convertedKey =
+                            Convert.ChangeType(
+                                generatedKey,
+                                targetType);
+
+                        property.SetValue(
+                            context.Entity,
+                            convertedKey);
+                    }
+
+                    context.AffectedRows = 1;
+                }
+
+                return;
+            }
         }
 
         context.AffectedRows =
