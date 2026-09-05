@@ -1,3 +1,4 @@
+using JwellerSaaS.Application.Identity;
 using JwellerSaaS.Application.Masters;
 using JwellerSaaS.Application.Products;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +14,7 @@ public static class ApplicationServiceCollectionExtensions
     {
         services.AddScoped<ICategoryBusinessService, CategoryBusinessService>();
         services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<IIdentityService, IdentityService>();
 
         return services;
     }
