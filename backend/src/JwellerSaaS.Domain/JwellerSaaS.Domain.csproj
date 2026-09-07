@@ -2,4 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Orion.Framework\Orion.Framework.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Transactions\" />
+  </ItemGroup>
 </Project>
